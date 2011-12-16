@@ -47,7 +47,7 @@ def server_and_client(addr, registry, die_after=None, timeout=1):
 
 
 def test_server_responds_correctly():
-    with server_and_client('inproc://tasks', REGISTRY, die_after=1) as client:
+    with server_and_client('inproc://zrpc', REGISTRY, die_after=1) as client:
         client.send_json({
             "id": "abc",
             "method": "add",
@@ -57,7 +57,7 @@ def test_server_responds_correctly():
 
 
 def test_missing_method_returns_an_error():
-    with server_and_client('inproc://tasks', REGISTRY, die_after=1) as client:
+    with server_and_client('inproc://zrpc', REGISTRY, die_after=1) as client:
         client.send_json({
             "id": "abc",
             "method": "doesnotexist",
@@ -72,7 +72,7 @@ def test_missing_method_returns_an_error():
 
 
 def test_errors_raised_in_method_are_returned():
-    with server_and_client('inproc://tasks', REGISTRY, die_after=1) as client:
+    with server_and_client('inproc://zrpc', REGISTRY, die_after=1) as client:
         client.send_json({
             "id": "abc",
             "method": "raises_error",
