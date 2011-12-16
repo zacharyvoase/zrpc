@@ -20,5 +20,6 @@ setup(
     package_dir={'': 'lib'},
     install_requires=[
         'pyzmq==2.1.10',
+        'Logbook==0.3',
     ],
 )
