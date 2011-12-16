@@ -1,3 +1,6 @@
+from zrpc.exceptions import MissingMethod
+
+
 class Registry(dict):
 
     """
@@ -27,4 +30,8 @@ class Registry(dict):
         return register_method
 
     def __call__(self, method_name, *args, **kwargs):
-        return self[method_name](*args, **kwargs)
+        try:
+            method = self[method_name]
+        except KeyError:
+            raise MissingMethod(method_name)
+        return method(*args, **kwargs)
