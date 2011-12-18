@@ -44,9 +44,9 @@ class Server(object):
     """
 
     def __init__(self, addr, registry, context=None):
+        self.context = context or zmq.Context.instance()
         self.addr = addr
         self.registry = registry
-        self.context = context or zmq.Context()
 
     def get_response(self, func, *args, **kwargs):
 

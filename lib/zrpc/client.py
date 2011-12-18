@@ -62,8 +62,8 @@ class Error(Exception):
 class Client(object):
 
     def __init__(self, addr, context=None):
+        self.context = context or zmq.Context.instance()
         self.addr = addr
-        self.context = context or zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(self.addr)
 
