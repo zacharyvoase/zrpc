@@ -8,6 +8,8 @@ import logbook
 import simplejson
 import zmq
 
+from zrpc.registry import Registry
+
 
 logger = logbook.Logger('zrpc.server')
 
@@ -31,21 +33,28 @@ class Server(object):
     any single concurrency model.
 
     .. py:attribute:: addr
-        The address to bind to as a full ZeroMQ-compatible string. Examples
+        The address to bind or connect to as a ZeroMQ-style address. Examples
         include ``'tcp://*:7341'`` and ``'inproc://tasks'``.
 
     .. py:attribute:: registry
         A :class:`Registry` object holding the method definitions for this
         server.
 
+    .. py:attribute:: connect
+        A boolean indicating whether the server should bind or connect to its
+        address. Default is ``False``, so the server will bind. Set to ``True``
+        if you're using a broker-model :class:`LoadBalancer`, and specify the
+        output address of that load balancer as this server's `addr`.
+
     .. py:attribute:: context
         A ``zmq.Context`` to use when creating sockets. Can be left unspecified
         and a new context will be created.
     """
 
-    def __init__(self, addr, registry, context=None):
+    def __init__(self, addr, registry, connect=False, context=None):
         self.context = context or zmq.Context.instance()
         self.addr = addr
+        self.connect = connect
         self.registry = registry
 
     def get_response(self, func, *args, **kwargs):
@@ -100,25 +109,31 @@ class Server(object):
         return response
 
     def run(self, die_after=None, bind_callback=None):
+
         """
         Run the worker, optionally dying after a number of requests.
 
         :param int die_after:
             Die after processing a set number of messages (default: continue
             forever).
+
         :param bind_callback:
-            A function/method which will be called when the server has
-            successfully created and bound its socket. A use of this is to
-            create a ``threading.Event`` and pass its ``set()`` method here.
-            This allows you to wait until the server is bound before beginning
-            client initialization, for example.
+            A function/method which will be called with the socket once it has
+            been successfully connected or bound. By using the ``put()`` method
+            of a ``Queue.Queue`` here you can wait until the server is bound
+            before beginning client initialization, for example.
         """
 
         socket = self.context.socket(zmq.REP)
-        logger.debug("Listening for requests on {0!r}", self.addr)
-        socket.bind(self.addr)
+        if self.connect:
+            logger.debug("Replying to requests from {0!r}", self.addr)
+            socket.connect(self.addr)
+        else:
+            logger.debug("Listening for requests on {0!r}", self.addr)
+            socket.bind(self.addr)
+
         if bind_callback:
-            bind_callback()
+            bind_callback(socket)
 
         iterator = die_after and repeat(None, die_after) or repeat(None)
         with nested(logger.catch_exceptions(), closing(socket)):
