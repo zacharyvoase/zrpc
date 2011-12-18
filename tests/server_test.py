@@ -33,7 +33,8 @@ def server_and_client(addr, registry, die_after=None, timeout=1):
     server = Server(addr, registry, context=context)
     server_thread = threading.Thread(
         target=server.run,
-        kwargs=dict(die_after=die_after, bind_callback=server_bind.set))
+        kwargs=dict(bind_callback=server_bind.set))
+    server_thread.daemon = True
     server_thread.start()
 
     client = context.socket(zmq.REQ)
@@ -43,7 +44,6 @@ def server_and_client(addr, registry, die_after=None, timeout=1):
         yield client
     finally:
         client.close()
-        server_thread.join(timeout=timeout)
 
 
 def test_server_responds_correctly():
