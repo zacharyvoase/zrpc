@@ -121,6 +121,7 @@ class Server(object):
             bind_callback()
 
         with closing(socket):
-            for _ in repeat(None, die_after):
+            iterator = die_after and repeat(None, die_after) or repeat(None)
+            for _ in iterator:
                 message = socket.recv_json()
                 socket.send_json(self.process_message(message))
