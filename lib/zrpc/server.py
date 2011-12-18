@@ -1,6 +1,6 @@
 from __future__ import with_statement
 
-from contextlib import closing
+from contextlib import closing, nested
 from itertools import repeat
 import traceback
 
@@ -120,8 +120,8 @@ class Server(object):
         if bind_callback:
             bind_callback()
 
-        with closing(socket):
-            iterator = die_after and repeat(None, die_after) or repeat(None)
+        iterator = die_after and repeat(None, die_after) or repeat(None)
+        with nested(logger.catch_exceptions(), closing(socket)):
             for _ in iterator:
                 message = socket.recv_json()
                 socket.send_json(self.process_message(message))

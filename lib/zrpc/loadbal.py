@@ -1,5 +1,8 @@
-import logbook
+from __future__ import with_statement
 
+from contextlib import closing, nested
+
+import logbook
 import zmq
 
 
@@ -62,8 +65,7 @@ class LoadBalancer(object):
         if setup_callback:
             setup_callback(input_socket, output_socket)
 
-        try:
+        with nested(logger.catch_exceptions(),
+                    closing(input_socket),
+                    closing(output_socket)):
             zmq.device(zmq.QUEUE, input_socket, output_socket)
-        finally:
-            input_socket.close()
-            output_socket.close()
