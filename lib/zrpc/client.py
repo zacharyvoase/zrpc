@@ -34,6 +34,12 @@ class Error(Exception):
         self.request = request
         self.response = response
 
+    def __repr__(self):
+        return 'Error[%s]' % (self.type,)
+
+    def __str__(self):
+        return self.message
+
     @property
     def id(self):
         return self.request['id']
