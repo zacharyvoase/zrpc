@@ -12,6 +12,7 @@ from zrpc.registry import Registry
 
 
 logger = logbook.Logger('zrpc.server')
+run_logger = logbook.Logger('zrpc.server.run')
 
 
 class Server(object):
@@ -69,7 +70,8 @@ class Server(object):
 
         result, error = None, None
         try:
-            result = func(*args, **kwargs)
+            with logger.catch_exceptions():
+                result = func(*args, **kwargs)
         except Exception, exc:
             exc_type = "%s.%s" % (type(exc).__module__, type(exc).__name__)
             exc_message = traceback.format_exception_only(type(exc), exc)[-1].strip()
@@ -126,17 +128,17 @@ class Server(object):
 
         socket = self.context.socket(zmq.REP)
         if self.connect:
-            logger.debug("Replying to requests from {0!r}", self.addr)
+            run_logger.debug("Replying to requests from {0!r}", self.addr)
             socket.connect(self.addr)
         else:
-            logger.debug("Listening for requests on {0!r}", self.addr)
+            run_logger.debug("Listening for requests on {0!r}", self.addr)
             socket.bind(self.addr)
 
         if bind_callback:
             bind_callback(socket)
 
         iterator = die_after and repeat(None, die_after) or repeat(None)
-        with nested(logger.catch_exceptions(), closing(socket)):
+        with nested(run_logger.catch_exceptions(), closing(socket)):
             for _ in iterator:
                 message = socket.recv_json()
                 socket.send_json(self.process_message(message))
