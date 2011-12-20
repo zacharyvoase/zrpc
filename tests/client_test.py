@@ -11,7 +11,7 @@ import zmq
 from zrpc.client import Client, Error
 
 
-def mock_context(request, response):
+def mock_context(response):
     with Mock() as context:
         context.__len__() >> 1
         socket = context.socket(zmq.REQ)
@@ -23,7 +23,6 @@ def mock_context(request, response):
 
 def test_client_returns_result_on_success():
     context = mock_context(
-        request={"id": "abc", "method": "add", "params": [3, 4]},
         response={"id": "abc", "result": 7, "error": None})
 
     client = Client('inproc://zrpc', context=context)
@@ -33,7 +32,6 @@ def test_client_returns_result_on_success():
 
 def test_client_raises_exception_on_failure():
     context = mock_context(
-        request={"id": instance_of(str), "method": "add", "params": [3]},
         response={"id": "abc", "result": None,
                   "error": {"type": "exceptions.TypeError",
                             "message": "TypeError: add expected 2 arguments, got 1",
@@ -46,7 +44,6 @@ def test_client_raises_exception_on_failure():
 
 def test_dotted_names_resolve_to_dotted_methods():
     context = mock_context(
-        request={"id": instance_of(str), "method": "math.add", "params": [3, 4]},
         response={"id": "abc", "result": 7, "error": None})
 
     client = Client('inproc://zrpc', context=context)
