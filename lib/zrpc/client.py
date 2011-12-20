@@ -85,8 +85,7 @@ class Client(object):
             return response['result']
         raise Error(request, response)
 
-    def __call__(self, method, *args, **kwargs):
-        params = dict(enumerate(args)).update(kwargs)
+    def __call__(self, method, *params):
         request = {"id": get_uuid(),
                    "method": method,
                    "params": params}
