@@ -1,10 +1,12 @@
 # ZRPC
 
-ZRPC is a library for building and using simple [ZeroMQ][]-based [JSON-RPC][]
-1.0 servers.
+ZRPC is a library for building and using simple [ZeroMQ][]-based RPC servers.
+It uses an *ad hoc* protocol based on [JSON-RPC 1.0][], with [BSON][] as a
+transport encoding and support for mixed positional and keyword arguments.
 
   [zeromq]: http://zeromq.org/
   [json-rpc]: http://json-rpc.org/
+  [bson]: http://bsonspec.org/
 
 
 ## Server Example

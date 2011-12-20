@@ -21,5 +21,6 @@ setup(
     install_requires=[
         'pyzmq==2.1.10',
         'Logbook==0.3',
+        'PyMongo==2.1',
     ],
 )

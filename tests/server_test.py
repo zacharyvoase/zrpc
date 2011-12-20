@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from Queue import Queue
 import threading
 
+from bson import BSON
 from nose.tools import assert_equal
 import zmq
 
@@ -44,7 +45,7 @@ def server(addr, registry, connect=False, context=None):
     try:
         yield
     finally:
-        server_socket.close()
+        context.term()
 
 
 @contextmanager
@@ -69,39 +70,41 @@ def server_and_client(addr, registry, connect=False, context=None):
 
 def test_server_responds_correctly():
     with server_and_client('inproc://zrpc', REGISTRY) as client:
-        client.send_json({
+        client.send(BSON.encode({
             "id": "abc",
             "method": "add",
-            "params": [3, 4]})
-        assert_equal(client.recv_json(),
+            "params": [3, 4]}))
+        assert_equal(BSON(client.recv()).decode(),
                      {"id": "abc", "result": 7, "error": None})
 
 
 def test_missing_method_returns_an_error():
     with server_and_client('inproc://zrpc', REGISTRY) as client:
-        client.send_json({
+        client.send(BSON.encode({
             "id": "abc",
             "method": "doesnotexist",
-            "params": [3, 4]})
-        assert_equal(client.recv_json(), {"id": "abc",
-                                      "result": None,
-                                      "error": {
-                                          "type": "zrpc.exceptions.MissingMethod",
-                                          "args": ["doesnotexist"],
-                                          "message": "MissingMethod: doesnotexist"
-                                      }})
+            "params": [3, 4]}))
+        assert_equal(BSON(client.recv()).decode(),
+                     {"id": "abc",
+                      "result": None,
+                      "error": {
+                          "type": "zrpc.exceptions.MissingMethod",
+                          "args": ["doesnotexist"],
+                          "message": "MissingMethod: doesnotexist"
+                      }})
 
 
 def test_errors_raised_in_method_are_returned():
     with server_and_client('inproc://zrpc', REGISTRY) as client:
-        client.send_json({
+        client.send(BSON.encode({
             "id": "abc",
             "method": "raises_error",
-            "params": []})
-        assert_equal(client.recv_json(), {"id": "abc",
-                                      "result": None,
-                                      "error": {
-                                          "type": "exceptions.Exception",
-                                          "args": ["some error occurred"],
-                                          "message": "Exception: some error occurred"
-                                      }})
+            "params": []}))
+        assert_equal(BSON(client.recv()).decode(),
+                     {"id": "abc",
+                      "result": None,
+                      "error": {
+                          "type": "exceptions.Exception",
+                          "args": ["some error occurred"],
+                          "message": "Exception: some error occurred"
+                      }})

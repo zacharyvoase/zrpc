@@ -2,6 +2,7 @@ from __future__ import with_statement
 
 import unittest
 
+from bson import BSON
 from ludibrio import Mock
 from ludibrio.matcher import instance_of
 from nose.tools import assert_raises
@@ -15,14 +16,14 @@ def mock_context(request, response):
         context.__len__() >> 1
         socket = context.socket(zmq.REQ)
         socket.connect('inproc://zrpc')
-        socket.send_json(request)
-        socket.recv_json() >> response
+        socket.send(instance_of(str))
+        socket.recv() >> BSON.encode(response)
     return context
 
 
 def test_client_returns_result_on_success():
     context = mock_context(
-        request={"id": instance_of(str), "method": "add", "params": [3, 4]},
+        request={"id": "abc", "method": "add", "params": [3, 4]},
         response={"id": "abc", "result": 7, "error": None})
 
     client = Client('inproc://zrpc', context=context)

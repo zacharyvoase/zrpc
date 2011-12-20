@@ -5,7 +5,7 @@ from itertools import repeat
 import traceback
 
 import logbook
-import simplejson
+from bson import BSON
 import zmq
 
 from zrpc.registry import Registry
@@ -22,7 +22,7 @@ class Server(object):
 
     A :class:`Server` listens on a ``zmq.REP`` socket for incoming requests,
     performs the requested methods (using a :class:`Registry`) and returns the
-    result. All communication is JSON-encoded.
+    result. All communication is BSON-encoded.
 
     Usage is pretty simple:
 
@@ -61,24 +61,23 @@ class Server(object):
     def get_response(self, func, *args, **kwargs):
 
         """
-        Run a Python function, returning the result in JSON-RPC form.
+        Run a Python function, returning the result in BSON-serializable form.
 
         The behaviour of this function is to capture either a successful return
-        value or exception in the JSON-RPC form (a dictionary with `result` and
-        `error` keys).
+        value or exception in a BSON-serializable form (a dictionary with
+        `result` and `error` keys).
         """
 
         result, error = None, None
         try:
-            with logger.catch_exceptions():
-                result = func(*args, **kwargs)
+            result = func(*args, **kwargs)
         except Exception, exc:
             exc_type = "%s.%s" % (type(exc).__module__, type(exc).__name__)
             exc_message = traceback.format_exception_only(type(exc), exc)[-1].strip()
             error = {"type": exc_type,
                      "message": exc_message}
             try:
-                simplejson.dumps(exc.args)
+                BSON.encode({'args': exc.args})
             except TypeError:
                 pass
             else:
@@ -140,5 +139,5 @@ class Server(object):
         iterator = die_after and repeat(None, die_after) or repeat(None)
         with nested(run_logger.catch_exceptions(), closing(socket)):
             for _ in iterator:
-                message = socket.recv_json()
-                socket.send_json(self.process_message(message))
+                message = BSON(socket.recv()).decode()
+                socket.send(BSON.encode(self.process_message(message)))

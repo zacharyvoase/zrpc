@@ -1,5 +1,6 @@
 import uuid
 
+from bson import BSON
 import zmq
 
 
@@ -84,12 +85,14 @@ class Client(object):
             return response['result']
         raise Error(request, response)
 
-    def __call__(self, method, *params):
+    def __call__(self, method, *args, **kwargs):
+        params = dict(enumerate(args)).update(kwargs)
         request = {"id": get_uuid(),
                    "method": method,
-                   "params": list(params)}
-        self.socket.send_json(request)
-        return self._process_response(request, self.socket.recv_json())
+                   "params": params}
+        self.socket.send(BSON.encode(request))
+        return self._process_response(request,
+                                      BSON(self.socket.recv()).decode())
 
 
 class ClientMethod(object):
