@@ -15,6 +15,10 @@ class Callback(object):
     thread boundaries as opposed to between coroutines. It should be used for
     synchronization where more than a typical ``threading.Event`` is needed,
     because values/exceptions need to be associated with those events.
+
+    The :meth:`spawn` and :meth:`die` methods, and the :attr:`event_class`
+    attribute can be overridden in subclasses to support alternative,
+    thread-like concurrency models (e.g. gevent, eventlet, etc.).
     """
 
     event_class = threading.Event
@@ -24,19 +28,53 @@ class Callback(object):
         self.value = None
         self.exc_info = None
 
+    def spawn(self, func, args=(), kwargs=None, **opts):
+
+        """
+        Abstract method for spawning a function in a new thread.
+
+        The returned object should represent the thread, and have at least a
+        ``join()`` method.
+        """
+
+        thread = threading.Thread(target=func, args=args,
+                                  kwargs=(kwargs or {}))
+        thread.daemon = opts.get('daemon', False)
+        thread.start()
+        return thread
+
     def reset(self):
+        """Reset this callback, allowing it to be used again."""
+
         self.event.clear()
         self.value = None
         self.exc_info = None
 
     def set(self):
+        """Alias for ``send(None)``."""
+
         self.send(None)
 
     def send(self, value):
+        """Pass the provided value to the waiting thread."""
+
         self.value = value
         self.event.set()
 
     def throw(self, *exc_info):
+
+        """
+        Throw the given exception in the waiting thread.
+
+        There are three valid ways of calling this method:
+
+        * No arguments: use ``sys.exc_info()`` as the source of the exception.
+        * 1 argument: an exception object. This is raised and immediately
+          caught so as to capture a traceback.
+        * 3 arguments: interpreted as the three parts of a ``sys.exc_info()``
+          tuple.
+        """
+
         if len(exc_info) == 0:
             exc_info = sys.exc_info()
         elif len(exc_info) == 1:
@@ -54,18 +92,28 @@ class Callback(object):
 
     @property
     def catch_exceptions(self):
+        """A context manager to catch and throw unhandled exceptions."""
+
         @contextmanager
         def exception_catcher(die=True):
             try:
                 yield
             except Exception, exc:
-                self.throw(*sys.exc_info())
+                self.throw()
                 if die:
-                    raise SystemExit  # Kill the current thread quietly.
-                raise  # Raise the original error.
+                    self.die()
+                else:
+                    raise
         return exception_catcher
 
+    def die(self):
+        """Abstract method to kill the current thread."""
+
+        raise SystemExit
+
     def wait(self):
+        """Wait for the callback to be called, and return/raise."""
+
         self.event.wait()
         if self.exc_info:
             raise self.exc_info[1]
@@ -74,7 +122,7 @@ class Callback(object):
 
 class DummyCallback(Callback):
 
-    """A null callback which never does anything."""
+    """A null callback which does nothing."""
 
     event_class = object
 
@@ -85,4 +133,22 @@ class DummyCallback(Callback):
         pass
 
     def wait(self):
-        return None
+        pass
+
+    def die(self):
+        pass
+
+
+try:
+    import gevent.event
+except ImportError:
+    pass
+else:
+    class GeventCallback(Callback):
+        """A callback class supporting gevent instead of threading."""
+
+        event_class = gevent.event.Event
+        die_exception = gevent.GreenletExit
+
+        def spawn(self, func, args=(), kwargs=None, **opts):
+            return gevent.spawn(func, *args, **(kwargs or {}))
