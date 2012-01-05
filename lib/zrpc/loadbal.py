@@ -5,6 +5,8 @@ from contextlib import closing, nested
 import logbook
 import zmq
 
+from zrpc.concurrency import DummyCallback
+
 
 logger = logbook.Logger('zrpc.loadbal')
 
@@ -48,22 +50,31 @@ class LoadBalancer(object):
         self.input = input
         self.output = output
 
-    def run(self, setup_callback=None):
-        logger.debug("Listening for requests on {0!r}", self.input)
-        input_socket = self.context.socket(zmq.XREP)
-        input_socket.bind(self.input)
+    def run(self, callback=DummyCallback()):
 
-        output_socket = self.context.socket(zmq.XREQ)
-        if hasattr(self.output, '__iter__'):
-            logger.debug("Connecting to {0} workers", len(self.output))
-            for node in self.output:
-                output_socket.connect(node)
-        else:
-            logger.debug("Listening for workers on {0!r}", self.output)
-            output_socket.bind(self.output)
+        """
+        Run the load balancer.
 
-        if setup_callback:
-            setup_callback(input_socket, output_socket)
+        :param callback:
+            A :class:`~zrpc.concurrency.Callback` which will be called with the
+            input and output sockets once they have been successfully connected
+            or bound.
+        """
+
+        with callback.catch_exceptions():
+            logger.debug("Listening for requests on {0!r}", self.input)
+            input_socket = self.context.socket(zmq.XREP)
+            input_socket.bind(self.input)
+
+            output_socket = self.context.socket(zmq.XREQ)
+            if hasattr(self.output, '__iter__'):
+                logger.debug("Connecting to {0} workers", len(self.output))
+                for node in self.output:
+                    output_socket.connect(node)
+            else:
+                logger.debug("Listening for workers on {0!r}", self.output)
+                output_socket.bind(self.output)
+        callback.send((input_socket, output_socket))
 
         with nested(logger.catch_exceptions(),
                     closing(input_socket),

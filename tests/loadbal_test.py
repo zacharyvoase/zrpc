@@ -6,6 +6,7 @@ import threading
 
 import zmq
 
+from zrpc.concurrency import Callback
 from zrpc.loadbal import LoadBalancer
 
 
@@ -25,18 +26,17 @@ def run_loadbal(input, output, context=None):
     # Set up a callback so we can be notified when the device connects/binds
     # its input and output sockets. This resolves issues with attempting to
     # connect to `inproc:` sockets before they've been bound at the other end.
-    queue = Queue()
-    callback = lambda *args: queue.put(args)
+    callback = Callback()
 
     # Run the load balancer device in a separate thread. This will die once
     # all its sockets are closed and the context terminated.
     loadbal = LoadBalancer(input, output, context=context)
     loadbal_thread = threading.Thread(target=loadbal.run,
-                                      kwargs={'setup_callback': callback})
+                                      kwargs={'callback': callback})
     loadbal_thread.daemon = True
     loadbal_thread.start()
 
-    in_sock, out_sock = queue.get()
+    in_sock, out_sock = callback.wait()
     client = context.socket(zmq.REQ)
     client.connect(input)
 

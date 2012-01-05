@@ -8,6 +8,7 @@ import logbook
 from bson import BSON
 import zmq
 
+from zrpc.concurrency import DummyCallback
 from zrpc.registry import Registry
 
 
@@ -109,7 +110,7 @@ class Server(object):
             response['id'] = message['id']
         return response
 
-    def run(self, die_after=None, bind_callback=None):
+    def run(self, die_after=None, callback=DummyCallback()):
 
         """
         Run the worker, optionally dying after a number of requests.
@@ -118,26 +119,29 @@ class Server(object):
             Die after processing a set number of messages (default: continue
             forever).
 
-        :param bind_callback:
-            A function/method which will be called with the socket once it has
-            been successfully connected or bound. By using the ``put()`` method
-            of a ``Queue.Queue`` here you can wait until the server is bound
-            before beginning client initialization, for example.
+        :param callback:
+            A :class:`~zrpc.concurrency.Callback` which will be called with the
+            socket once it has been successfully connected or bound.
         """
 
-        socket = self.context.socket(zmq.REP)
-        if self.connect:
-            run_logger.debug("Replying to requests from {0!r}", self.addr)
-            socket.connect(self.addr)
-        else:
-            run_logger.debug("Listening for requests on {0!r}", self.addr)
-            socket.bind(self.addr)
-
-        if bind_callback:
-            bind_callback(socket)
+        with callback.catch_exceptions():
+            socket = self.context.socket(zmq.REP)
+            if self.connect:
+                run_logger.debug("Replying to requests from {0!r}", self.addr)
+                socket.connect(self.addr)
+            else:
+                run_logger.debug("Listening for requests on {0!r}", self.addr)
+                socket.bind(self.addr)
+        callback.send(socket)
 
         iterator = die_after and repeat(None, die_after) or repeat(None)
         with nested(run_logger.catch_exceptions(), closing(socket)):
-            for _ in iterator:
-                message = BSON(socket.recv()).decode()
-                socket.send(BSON.encode(self.process_message(message)))
+            try:
+                for _ in iterator:
+                    message = BSON(socket.recv()).decode()
+                    socket.send(BSON.encode(self.process_message(message)))
+            except zmq.ZMQError, exc:
+                if exc.errno == zmq.ETERM:
+                    pass
+                else:
+                    raise

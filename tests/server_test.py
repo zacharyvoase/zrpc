@@ -8,6 +8,7 @@ from bson import BSON
 from nose.tools import assert_equal
 import zmq
 
+from zrpc.concurrency import Callback
 from zrpc.server import Server
 from zrpc.registry import Registry
 
@@ -29,18 +30,18 @@ def server(addr, registry, connect=False, context=None):
     context = context or zmq.Context.instance()
 
     # Set up a server, tell it to run in a separate thread, and pass in a
-    # bind_callback so that we can wait for the server to be bound before
-    # connecting our client. This avoids an issue we were having with inproc://
-    # transport, wherein if the client connected before the server had bound,
-    # it would raise an error.
-    server_bind = Queue()
+    # callback so that we can wait for the server to be bound before connecting
+    # our client. This avoids an issue we were having with inproc:// transport,
+    # wherein if the client connected before the server had bound, it would
+    # raise an error.
+    callback = Callback()
     server = Server(addr, registry, connect=connect, context=context)
     server_thread = threading.Thread(
         target=server.run,
-        kwargs=dict(bind_callback=server_bind.put))
+        kwargs=dict(callback=callback))
     server_thread.daemon = True
     server_thread.start()
-    server_socket = server_bind.get()
+    server_socket = callback.wait()
 
     try:
         yield
