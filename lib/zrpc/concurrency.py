@@ -17,8 +17,10 @@ class Callback(object):
     because values/exceptions need to be associated with those events.
     """
 
+    event_class = threading.Event
+
     def __init__(self):
-        self.event = threading.Event()
+        self.event = self.event_class()
         self.value = None
         self.exc_info = None
 
@@ -68,3 +70,19 @@ class Callback(object):
         if self.exc_info:
             raise self.exc_info[1]
         return self.value
+
+
+class DummyCallback(Callback):
+
+    """A null callback which never does anything."""
+
+    event_class = object
+
+    def throw(self, *args):
+        pass
+
+    def send(self, value):
+        pass
+
+    def wait(self):
+        return None
