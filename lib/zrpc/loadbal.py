@@ -68,4 +68,10 @@ class LoadBalancer(object):
         with nested(logger.catch_exceptions(),
                     closing(input_socket),
                     closing(output_socket)):
-            zmq.device(zmq.QUEUE, input_socket, output_socket)
+            try:
+                zmq.device(zmq.QUEUE, input_socket, output_socket)
+            except zmq.ZMQError, exc:
+                if exc.errno == zmq.ETERM:
+                    pass
+                else:
+                    raise
