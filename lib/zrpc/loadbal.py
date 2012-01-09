@@ -9,6 +9,7 @@ from zrpc.concurrency import DummyCallback
 
 
 logger = logbook.Logger('zrpc.loadbal')
+run_logger = logbook.Logger('zrpc.loadbal.run')
 
 
 class LoadBalancer(object):
@@ -76,13 +77,15 @@ class LoadBalancer(object):
                 output_socket.bind(self.output)
         callback.send((input_socket, output_socket))
 
-        with nested(logger.catch_exceptions(),
+        with nested(run_logger.catch_exceptions(),
                     closing(input_socket),
                     closing(output_socket)):
             try:
                 device(zmq.QUEUE, input_socket, output_socket)
             except zmq.ZMQError, exc:
                 if exc.errno == zmq.ETERM:
-                    pass
+                    run_logger.info("Context was terminated, shutting down")
                 else:
                     raise
+            except KeyboardInterrupt:
+                run_logger.info("SIGINT received, shutting down")

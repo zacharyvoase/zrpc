@@ -142,6 +142,8 @@ class Server(object):
                     socket.send(BSON.encode(self.process_message(message)))
             except zmq.ZMQError, exc:
                 if exc.errno == zmq.ETERM:
-                    pass
+                    run_logger.info("Context was terminated, shutting down")
                 else:
                     raise
+            except KeyboardInterrupt:
+                run_logger.info("SIGINT received, shutting down")
