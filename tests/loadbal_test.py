@@ -44,8 +44,6 @@ def run_loadbal(input, output, context=None):
         yield client
     finally:
         client.close()
-        in_sock.close()
-        out_sock.close()
 
 
 @contextmanager
