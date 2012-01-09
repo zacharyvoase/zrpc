@@ -26,10 +26,8 @@ def multiserver_and_client(address, registry, n_workers):
     try:
         cb = Callback()
         ms = MultiServer(address, registry, context=context)
-        ms_thread = threading.Thread(target=ms.run,
-                                    args=(n_workers,),
-                                    kwargs={'callback': cb})
-        ms_thread.daemon = True
+        ms_thread = cb.spawn(ms.run, args=(n_workers,),
+                             kwargs={'callback': cb}, daemon=True)
         ms_thread.start()
 
         cb.wait()
