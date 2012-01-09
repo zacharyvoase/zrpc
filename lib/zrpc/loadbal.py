@@ -50,7 +50,7 @@ class LoadBalancer(object):
         self.input = input
         self.output = output
 
-    def run(self, callback=DummyCallback()):
+    def run(self, callback=DummyCallback(), device=zmq.device):
 
         """
         Run the load balancer.
@@ -80,7 +80,7 @@ class LoadBalancer(object):
                     closing(input_socket),
                     closing(output_socket)):
             try:
-                zmq.device(zmq.QUEUE, input_socket, output_socket)
+                device(zmq.QUEUE, input_socket, output_socket)
             except zmq.ZMQError, exc:
                 if exc.errno == zmq.ETERM:
                     pass
