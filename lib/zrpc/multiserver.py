@@ -12,6 +12,7 @@ from zrpc.server import Server
 
 
 logger = logbook.Logger('zrpc.multiserver')
+run_logger = logbook.Logger('zrpc.multiserver.run')
 
 
 class MultiServer(object):
@@ -55,16 +56,18 @@ class MultiServer(object):
             server_threads = []
             server_callbacks = []
 
+            run_logger.debug("Spawning {0} workers", n_workers)
             for i in xrange(n_workers):
                 server_callback = type(callback)()
                 server_thread = server_callback.spawn(
                     server.run, kwargs={'callback': server_callback})
                 server_threads.append(server_thread)
                 server_callbacks.append(server_callback)
+            run_logger.debug("Spawned {0} workers", n_workers)
 
             # Wait for all callbacks to complete before triggering ours.
             server_sockets = [server_callback.wait()
-                            for server_callback in server_callbacks]
+                              for server_callback in server_callbacks]
 
         callback.send(server_sockets)
 
