@@ -24,7 +24,7 @@ class MultiServer(object):
         self.connect = connect
         self.registry = registry
 
-    def run_device(self, daemon=True, callback=DummyCallback()):
+    def run_device(self, callback=DummyCallback(), device=zmq.device):
 
         """
         Run the ZMQ queue device in a background thread.
@@ -37,20 +37,17 @@ class MultiServer(object):
 
         output_addr = 'inproc://%s' % uuid.uuid4()
         loadbal = LoadBalancer(self.addr, output_addr, context=self.context)
-
-        loadbal_thread = threading.Thread(target=loadbal.run,
-                                          kwargs={'callback': callback})
-        loadbal_thread.daemon = daemon
-        loadbal_thread.start()
-
+        loadbal_thread = callback.spawn(loadbal.run,
+                                        kwargs={'callback': callback,
+                                                'device': device})
         return output_addr
 
-    def run(self, n_workers, callback=DummyCallback(), daemon=True):
+    def run(self, n_workers, callback=DummyCallback(), device=zmq.device):
         loadbal_callback = type(callback)()
         loadbal_addr = self.run_device(callback=loadbal_callback,
-                                       daemon=daemon)
+                                       device=device)
         # We need the load balancer to be bound before continuing.
-        loadbal_callback.wait() 
+        loadbal_callback.wait()
 
         with callback.catch_exceptions():
             server = Server(loadbal_addr, self.registry, connect=True,
@@ -60,10 +57,8 @@ class MultiServer(object):
 
             for i in xrange(n_workers):
                 server_callback = type(callback)()
-                server_thread = threading.Thread(
-                    target=server.run, kwargs={'callback': server_callback})
-                server_thread.daemon = daemon
-                server_thread.start()
+                server_thread = server_callback.spawn(
+                    server.run, kwargs={'callback': server_callback})
                 server_threads.append(server_thread)
                 server_callbacks.append(server_callback)
 
