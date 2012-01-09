@@ -22,6 +22,7 @@ class Callback(object):
     """
 
     event_class = threading.Event
+    die_exception = SystemExit
 
     def __init__(self):
         self.event = self.event_class()
@@ -109,7 +110,7 @@ class Callback(object):
     def die(self):
         """Abstract method to kill the current thread."""
 
-        raise SystemExit
+        raise self.die_exception
 
     def wait(self):
         """Wait for the callback to be called, and return/raise."""
