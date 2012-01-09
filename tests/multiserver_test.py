@@ -28,7 +28,6 @@ def multiserver_and_client(address, registry, n_workers):
         ms = MultiServer(address, registry, context=context)
         ms_thread = cb.spawn(ms.run, args=(n_workers,),
                              kwargs={'callback': cb}, daemon=True)
-        ms_thread.start()
 
         cb.wait()
         client = context.socket(zmq.REQ)
