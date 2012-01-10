@@ -89,7 +89,7 @@ class LoadBalancer(object):
             try:
                 device(zmq.QUEUE, input_socket, output_socket)
             except zmq.ZMQError, exc:
-                if exc.errno == zmq.ETERM:
+                if exc.errno in (0, zmq.ETERM, zmq.EAGAIN):
                     run_logger.info("Context was terminated, shutting down")
                 else:
                     raise
