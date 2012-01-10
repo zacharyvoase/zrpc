@@ -19,8 +19,10 @@ class MultiServer(object):
 
     """A multi-threaded ZMQ server."""
 
-    def __init__(self, addr, registry, connect=False, context=None):
+    def __init__(self, addr, registry, connect=False, context=None,
+                 lb_context=None):
         self.context = context or zmq.Context.instance()
+        self.lb_context = lb_context or self.context
         self.addr = addr
         self.connect = connect
         self.registry = registry
@@ -37,7 +39,7 @@ class MultiServer(object):
         """
 
         output_addr = 'inproc://%s' % uuid.uuid4()
-        loadbal = LoadBalancer(self.addr, output_addr, context=self.context)
+        loadbal = LoadBalancer(self.addr, output_addr, context=self.lb_context)
         loadbal_thread = callback.spawn(loadbal.run,
                                         kwargs={'callback': callback,
                                                 'device': device})
