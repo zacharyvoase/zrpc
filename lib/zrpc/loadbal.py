@@ -51,6 +51,12 @@ class LoadBalancer(object):
         self.input = input
         self.output = output
 
+    def get_socket(self, sock_type):
+        """Ensure we get a blocking (i.e. non-green) socket."""
+
+        # gevent_zeromq monkey patches zmq.Socket but not the full path.
+        return zmq.core.socket.Socket(self.context, sock_type)
+
     def run(self, callback=DummyCallback(), device=zmq.device):
 
         """
@@ -64,10 +70,10 @@ class LoadBalancer(object):
 
         with callback.catch_exceptions():
             logger.debug("Listening for requests on {0!r}", self.input)
-            input_socket = self.context.socket(zmq.XREP)
+            input_socket = self.get_socket(zmq.XREP)
             input_socket.bind(self.input)
 
-            output_socket = self.context.socket(zmq.XREQ)
+            output_socket = self.get_socket(zmq.XREQ)
             if hasattr(self.output, '__iter__'):
                 logger.debug("Connecting to {0} workers", len(self.output))
                 for node in self.output:
