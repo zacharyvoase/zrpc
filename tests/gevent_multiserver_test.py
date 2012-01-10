@@ -22,12 +22,14 @@ def add(x, y):
 
 
 @contextmanager
-def multiserver_and_client(address, registry, n_workers, context=None):
+def multiserver_and_client(address, registry, n_workers, context=None,
+                           lb_context=None):
     context = context or zmq.Context.instance()
 
     try:
         cb = GeventCallback()
-        ms = MultiServer(address, registry, context=context)
+        ms = MultiServer(address, registry, context=context,
+                         lb_context=lb_context)
         ms_gl = cb.spawn(ms.run, args=(n_workers,),
                          kwargs={'callback': cb,
                                  'device': selfpiped(zmq.device)})
@@ -46,7 +48,9 @@ def multiserver_and_client(address, registry, n_workers, context=None):
 
 def test_server_responds_correctly():
     context = gevent_zeromq.zmq.Context()
-    with multiserver_and_client('inproc://zrpc', REGISTRY, 4, context=context) as client:
+    blocking_context = super(gevent_zeromq.zmq.Context, context)
+    with multiserver_and_client('inproc://zrpc', REGISTRY, 4, context=context,
+                                lb_context=blocking_context) as client:
         client.send(BSON.encode({
             "id": "abc",
             "method": "add",
