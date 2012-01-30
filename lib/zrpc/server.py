@@ -14,6 +14,7 @@ from zrpc.registry import Registry
 
 logger = logbook.Logger('zrpc.server')
 run_logger = logbook.Logger('zrpc.server.run')
+pm_logger = logbook.Logger('zrpc.server.process_message')
 
 
 class Server(object):
@@ -73,6 +74,7 @@ class Server(object):
         try:
             result = func(*args, **kwargs)
         except Exception, exc:
+            pm_logger.exception()
             exc_type = "%s.%s" % (type(exc).__module__, type(exc).__name__)
             exc_message = traceback.format_exception_only(type(exc), exc)[-1].strip()
             error = {"type": exc_type,
