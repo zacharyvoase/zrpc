@@ -15,6 +15,12 @@ from zrpc.registry import Registry
 
 REGISTRY = Registry()
 
+
+class Unserializable(object):
+    def __repr__(self):
+        return '<unserializable>'
+
+
 @REGISTRY.method
 def add(x, y):
     return x + y
@@ -23,6 +29,11 @@ def add(x, y):
 @REGISTRY.method
 def raises_error():
     raise Exception("some error occurred")
+
+
+@REGISTRY.method
+def returns_bson_unserializable_obj():
+    return Unserializable()
 
 
 @contextmanager
@@ -108,4 +119,20 @@ def test_errors_raised_in_method_are_returned():
                           "type": "exceptions.Exception",
                           "args": ["some error occurred"],
                           "message": "Exception: some error occurred"
+                      }})
+
+
+def test_bson_unserializable_objects_returned_raise_an_error():
+    with server_and_client('inproc://zrpc', REGISTRY) as client:
+        client.send(BSON.encode({
+            "id": "abc",
+            "method": "returns_bson_unserializable_obj",
+            "params": []}))
+        assert_equal(BSON(client.recv()).decode(),
+                     {"id": "abc",
+                      "result": None,
+                      "error": {
+                          "type": "bson.errors.InvalidDocument",
+                          "args": ["Cannot encode object: <unserializable>"],
+                          "message": "InvalidDocument: Cannot encode object: <unserializable>"
                       }})
