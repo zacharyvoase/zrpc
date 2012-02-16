@@ -2,10 +2,11 @@ from __future__ import with_statement
 
 from contextlib import closing, nested
 from itertools import repeat
+import sys
 import traceback
 
 import logbook
-from bson import BSON
+from bson import BSON, InvalidDocument
 import zmq
 
 from zrpc.concurrency import DummyCallback
@@ -60,13 +61,31 @@ class Server(object):
         self.connect = connect
         self.registry = registry
 
-    def get_response(self, func, *args, **kwargs):
+    @staticmethod
+    def capture_exception():
+        """Capture the current exception as a BSON-serializable dictionary."""
+
+        pm_logger.exception()
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        exc_type_string = "%s.%s" % (exc_type.__module__, exc_type.__name__)
+        exc_message = traceback.format_exception_only(exc_type, exc_value)[-1].strip()
+        error = {"type": exc_type_string,
+                 "message": exc_message}
+        try:
+            BSON.encode({'args': exc_value.args})
+        except InvalidDocument:
+            pass
+        else:
+            error["args"] = exc_value.args
+        return error
+
+    def get_response(self, message_id, func, *args, **kwargs):
 
         """
         Run a Python function, returning the result in BSON-serializable form.
 
         The behaviour of this function is to capture either a successful return
-        value or exception in a BSON-serializable form (a dictionary with
+        value or exception in a BSON-serialized form (a dictionary with `id`,
         `result` and `error` keys).
         """
 
@@ -74,19 +93,19 @@ class Server(object):
         try:
             result = func(*args, **kwargs)
         except Exception, exc:
-            pm_logger.exception()
-            exc_type = "%s.%s" % (type(exc).__module__, type(exc).__name__)
-            exc_message = traceback.format_exception_only(type(exc), exc)[-1].strip()
-            error = {"type": exc_type,
-                     "message": exc_message}
-            try:
-                BSON.encode({'args': exc.args})
-            except TypeError:
-                pass
-            else:
-                error["args"] = exc.args
+            error = self.capture_exception()
 
-        return {'result': result, 'error': error}
+        response = {'result': result, 'error': error}
+        if message_id is not None:
+            response['id'] = message_id
+
+        try:
+            return BSON.encode(response)
+        except InvalidDocument, exc:
+            response['error'] = self.capture_exception()
+            response['result'] = None
+            return BSON.encode(response)
+
 
     def process_message(self, message):
 
@@ -105,11 +124,10 @@ class Server(object):
         else:
             logger.debug("Processing method {0!r}", message['method'])
 
-        response = self.get_response(self.registry,
+        response = self.get_response(message.get('id', None),
+                                     self.registry,
                                      message['method'],
                                      *message['params'])
-        if 'id' in message:
-            response['id'] = message['id']
         return response
 
     def run(self, die_after=None, callback=DummyCallback()):
@@ -141,7 +159,7 @@ class Server(object):
             try:
                 for _ in iterator:
                     message = BSON(socket.recv()).decode()
-                    socket.send(BSON.encode(self.process_message(message)))
+                    socket.send(self.process_message(message))
             except zmq.ZMQError, exc:
                 if exc.errno == zmq.ETERM:
                     run_logger.info("Context was terminated, shutting down")
