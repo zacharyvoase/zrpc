@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>ZRPC by zacharyvoase</title>
+    
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>ZRPC</h1>
+        <p>ØMQ-based BSON-RPC in Python.</p>
+        <p class="view"><a href="https://github.com/zacharyvoase/zrpc">View the Project on GitHub <small>zacharyvoase/zrpc</small></a></p>
+        <ul>
+          <li><a href="https://github.com/zacharyvoase/zrpc/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/zacharyvoase/zrpc/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/zacharyvoase/zrpc">Fork On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <p>ZRPC is a library for building and using simple <a href="http://zeromq.org/">ZeroMQ</a>-based RPC servers.
+It uses an <em>ad hoc</em> protocol based on <a href="http://json-rpc.org/">JSON-RPC 1.0</a>, with <a href="http://bsonspec.org/">BSON</a> as a
+transport encoding and support for mixed positional and keyword arguments.</p>
+
+<h2>Server Example</h2>
+
+<div class="highlight">
+<pre><span class="kn">from</span> <span class="nn">zrpc.server</span> <span class="kn">import</span> <span class="n">Registry</span><span class="p">,</span> <span class="n">Server</span>
+
+<span class="c"># Create a registry and define some methods.</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">()</span>
+
+<span class="nd">@registry.method</span>
+<span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+<span class="nd">@registry.method</span>
+<span class="k">def</span> <span class="nf">factorial</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">*</span> <span class="n">y</span><span class="p">,</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+
+<span class="c"># Create and run a server using the registry.</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">Server</span><span class="p">(</span><span class="s">'tcp://*:5000'</span><span class="p">,</span> <span class="n">registry</span><span class="p">)</span>
+<span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre>
+</div>
+
+
+<h2>Client Example</h2>
+
+<div class="highlight">
+<pre><span class="kn">from</span> <span class="nn">zrpc.client</span> <span class="kn">import</span> <span class="n">Client</span>
+
+<span class="n">c</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="s">'tcp://127.0.0.1:5000'</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">c</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="mi">7</span>
+<span class="k">assert</span> <span class="n">c</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2432902008176640000</span>
+</pre>
+</div>
+
+
+<h2>Load Balancer Example</h2>
+
+<div class="highlight">
+<pre><span class="kn">from</span> <span class="nn">zrpc.loadbal</span> <span class="kn">import</span> <span class="n">LoadBalancer</span>
+
+<span class="c"># The 'proxy' model -- the list of downstream servers is fixed.</span>
+<span class="n">lb</span> <span class="o">=</span> <span class="n">LoadBalancer</span><span class="p">(</span><span class="s">'tcp://127.0.0.1:5010'</span><span class="p">,</span> <span class="p">(</span><span class="s">'tcp://127.0.0.1:5000'</span><span class="p">,))</span>
+<span class="n">lb</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+<span class="c"># The 'broker' model -- downstream servers can come and go, but they need</span>
+<span class="c"># to specify `connect=True` with an address of 'tcp://127.0.0.1:5005' to</span>
+<span class="c"># connect to the output port of the balancer.</span>
+<span class="n">lb</span> <span class="o">=</span> <span class="n">LoadBalancer</span><span class="p">(</span><span class="s">'tcp://127.0.0.1:5010'</span><span class="p">,</span> <span class="s">'tcp://127.0.0.1:5005'</span><span class="p">)</span>
+<span class="n">lb</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre>
+</div>
+
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/zacharyvoase">zacharyvoase</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+  </body>
+</html>
